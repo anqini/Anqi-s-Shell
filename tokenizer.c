@@ -130,7 +130,6 @@ char **get_tokens(struct tokens *tokens) {
 				return NULL;
 		} else {
 				if (tokens->tokens_length <= 0) {
-					printf("invalide length!\n");
 					return NULL;
 				}	
 				// char **temp_tokens = malloc(n * sizeof(char*));

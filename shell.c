@@ -101,27 +101,22 @@ int lookup(char cmd[]) {
 /* output -2 meaning invalide redirection */
 /* output  0 meaning input redirection    */
 /* output  1 meaning output redirection   */
-int detect_redirection(struct tokens *tokens, int fd) {
+int detect_redirection(struct tokens *tokens) {
 	for (int i = 0; i < tokens_get_length(tokens); i++) {
 		/* redirect input detected */
 		if (!strcmp(tokens_get_token(tokens, i), "<")) {
+			// check the source of input direction
 			if (i != tokens_get_length(tokens) - 2) {
 				return -2;
-			} else {
+			} else { // input redirection detected
 				return 0;
 			}
-			/* redirect output detected */
+		/* redirect output detected */
 		} else if (!strcmp(tokens_get_token(tokens, i), ">")) {
 			/* check if there is a target or source for redirection */
 			if (i != tokens_get_length(tokens) - 2) {
-				printf("Arguments are not enough...");
 				return -2;
-			} else {
-				printf("output redirection has been detected.");
-				/* open target file for redirection */
-				// fd = open(tokens_get_token(tokens, i + 1), O_WRONLY | O_CREAT);
-				// if (fd < 0) break;
-				// if (dup2(fd, 1) == -1) break;
+			} else { // output redirection detected
 				return 1;
 			}
 		}
@@ -174,14 +169,47 @@ int main(unused int argc, unused char *argv[]) {
 	while (fgets(line, 4096, stdin)) {
 		/* Split our line into words. */
 		struct tokens *tokens = tokenize(line);
+		/* get a copy of tokens pointer array */
+		char *tokens_copy[20] = {NULL};
+		memcpy(tokens_copy, get_tokens(tokens), tokens_get_length(tokens) * sizeof(char*)); 
 		/* file descripter */
 		int fd;
+		int saved_stdout = dup(1);
+		int saved_stdin = dup(0);
 		/* redirection flag for free mem use */
 		_Bool redir_out = false;
 		_Bool redir_in = false;
 		/* Find which built-in function to run. */
 		int fundex = lookup(tokens_get_token(tokens, 0));
-
+		/* check redirection output */
+		if (detect_redirection(tokens) == 1) {
+			/* open file */
+			fd = open(tokens_get_token(tokens, tokens_get_length(tokens) - 1), O_WRONLY | O_CREAT);
+			/* redirect output */
+			if (dup2(fd, 1) < 0)
+				printf("Convert output failed.");
+			/* set flag */
+			redir_out = true;
+			/* shorten the tokens array: eliminate last two elements */	
+			tokens_copy[tokens_get_length(tokens) - 1] = NULL;
+			tokens_copy[tokens_get_length(tokens) - 2] = NULL;
+		/* check redirection input */
+		} else if (detect_redirection(tokens) == 0) {
+			/* open input redirection file */
+			fd = open(tokens_get_token(tokens, tokens_get_length(tokens) - 1), O_RDONLY);
+			/* error checking */
+			if (fd < 0) {
+				printf("Input file doesn't exist.\n");
+				exit(0);
+			}
+			/* redirection input*/
+			if (dup2(fd, 0) < 0)
+				printf("Convert input failed.");
+			/* set flag */
+			redir_in = true;
+            tokens_copy[tokens_get_length(tokens) - 1] = NULL;
+            tokens_copy[tokens_get_length(tokens) - 2] = NULL;
+		}
 		if (fundex >= 0) {
 			cmd_table[fundex].fun(tokens);
 		} else {
@@ -190,17 +218,18 @@ int main(unused int argc, unused char *argv[]) {
 			child_pid = fork();
 			if(child_pid == 0) {
 				/* This is done by the child process. */
-				execv(tokens_get_token(tokens, 0), get_tokens(tokens));
+				execv(tokens_get_token(tokens, 0), tokens_copy);
 				/* if this call return, meaning PATH is not correct */
 				char *token = strtok(path, delim);
 				while(token != NULL)
 				{
+					/* concatenate Full Path */
 					strcpy(execPath, token);
 					strcat(execPath, "/");
 					strcat(execPath, tokens_get_token(tokens, 0));
-					execv(execPath, get_tokens(tokens));
-					/* free the memory if execution failed */
-					// free(temp_tokens);
+					tokens_copy[0] = execPath;
+					/* execute the command */
+					execv(execPath, tokens_copy);
 					token = strtok(NULL, delim);
 				}
 
@@ -212,7 +241,22 @@ int main(unused int argc, unused char *argv[]) {
 			else {
 				wait(&status);
 			}
-			// free(temp_tokens);
+			/* check if the output is redirected */
+			if (redir_out) {
+				if(dup2(saved_stdout, 1) < 0)
+					printf("convert stdout failed...\n");
+				close(saved_stdout);
+				close(fd);
+				redir_out = false;
+			}
+			/* check if the input is redirected */
+			if (redir_in) {
+				if(dup2(saved_stdin, 0) < 0)
+					printf("Convert stdin Back failed...\n");
+				close(saved_stdin);
+				close(fd);
+				redir_in = false;
+			}
 		}
 
 		if (shell_is_interactive)
