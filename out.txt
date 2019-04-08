@@ -1,0 +1,2 @@
+/home/angelo/.local/bin/ls/usr/local/sbin/ls/usr/local/bin/ls/usr/sbin/ls/usr/bin/ls/sbin/ls/bin/ls/usr/games/ls/usr/local/games/ls/snap/bin/lsUnknown command
+2: 3: 4: 5: 
