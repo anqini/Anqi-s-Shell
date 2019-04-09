@@ -114,14 +114,11 @@ char *tokens_get_token(struct tokens *tokens, size_t n) {
 		}
 }
 
-void shorten_token(struct tokens *tokens) {
-		if (tokens == NULL || tokens->tokens_length >= 3) {
+void shorten_tokens(struct tokens *tokens, size_t n) {
+		if (tokens == NULL || tokens->tokens_length <= n) {
 				return;
 		} else {
-				tokens->tokens_length -= 2;
-				size_t length = tokens->tokens_length;
-				char **ptr = tokens->tokens;
-				memcpy(tokens->tokens, ptr[length], length * sizeof(*ptr));
+				tokens->tokens_length -= n;
 		}
 }
 

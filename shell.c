@@ -122,7 +122,16 @@ int detect_redirection(struct tokens *tokens) {
 		}
 	}
 	return -1;
+}
 
+/* detect bg processing operator '&' */
+int bg_proc_detect(struct tokens *tokens) {
+	if (tokens_get_length(tokens) == 0)
+		return -1;
+    if(!strcmp(tokens_get_token(tokens, tokens_get_length(tokens) - 1), "&"))
+        return 0;
+    else
+        return -1;
 }
 
 /* Intialization procedures for this shell */
@@ -151,6 +160,10 @@ void init_shell() {
 	}
 }
 
+void child_handler() {
+	printf("child process terminated.\n");
+}
+
 int main(unused int argc, unused char *argv[]) {
 	init_shell();
 
@@ -159,6 +172,8 @@ int main(unused int argc, unused char *argv[]) {
 	char *path = getenv("PATH");
 	/* set deliminator to colon */
 	char *delim = ":";
+	/* init bg jobs */
+	int jobs[100];
 	/* init temp exepath to store temp string */
 	char execPath[100];
 	/* Please only print shell prompts when standard input is not a tty */
@@ -177,8 +192,19 @@ int main(unused int argc, unused char *argv[]) {
 		/* redirection flag for free mem use */
 		_Bool redir_out = false;
 		_Bool redir_in = false;
+		_Bool bg_proc = false;
 		/* Find which built-in function to run. */
 		int fundex = lookup(tokens_get_token(tokens, 0));
+		/* cg processing detect */
+		if (!bg_proc_detect(tokens)) {
+			bg_proc = true;
+			// prevent children from being zombie
+        	signal(SIGCHLD, child_handler);
+			tokens_copy[tokens_get_length(tokens) - 1] = NULL;
+			shorten_tokens(tokens, 1);
+		} else {
+			signal(SIGCHLD, SIG_DFL);
+		}
 		/* check redirection output */
 		if (detect_redirection(tokens) == 1) {
 			/* open file */
@@ -188,9 +214,10 @@ int main(unused int argc, unused char *argv[]) {
 				printf("Convert output failed.");
 			/* set flag */
 			redir_out = true;
-			/* shorten the tokens array: eliminate last two elements */	
+			/* shorten the tokens array: eliminate last two elements */
 			tokens_copy[tokens_get_length(tokens) - 1] = NULL;
 			tokens_copy[tokens_get_length(tokens) - 2] = NULL;
+			shorten_tokens(tokens, 2);
 		/* check redirection input */
 		} else if (detect_redirection(tokens) == 0) {
 			/* open input redirection file */
@@ -226,9 +253,11 @@ int main(unused int argc, unused char *argv[]) {
 					perror("setpgid failed.");
 				/* ignore tty output signal */
 				signal(SIGTTOU, SIG_IGN);
-				/* change this process to foreground */
-				if(tcsetpgrp(0, cpid) < 0)
-                    perror("tcsetpgrp failed.");
+				/* change to fg process */
+				if (!bg_proc) {
+					if(tcsetpgrp(0, cpid) < 0)
+                    	perror("tcsetpgrp failed.");
+				}
 				/* This is done by the child process. */
 				execv(tokens_get_token(tokens, 0), tokens_copy);
 				/* if this call return, meaning PATH is not correct */
@@ -262,9 +291,12 @@ int main(unused int argc, unused char *argv[]) {
 				if (setpgid(ppid, ppid) < 0)
 					perror("set group id failed.");
 				/* wait for child process */
-				wait(&status);
+				if (!bg_proc) {
+					wait(&status);
+				}
 				if (tcsetpgrp(0, ppid) < 0)
 					perror("convert background to fg failed.");
+				signal(SIGTTOU, SIG_DFL);
 			}
 			/* check if the output is redirected */
 			if (redir_out) {

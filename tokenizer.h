@@ -13,7 +13,7 @@ size_t tokens_get_length(struct tokens *tokens);
 char *tokens_get_token(struct tokens *tokens, size_t n);
 
 /* shorten the token when redirecting */
-void shorten_token(struct tokens *tokens);
+void shorten_tokens(struct tokens *tokens, size_t n);
 
 /* print tokens array */
 void print_tokens_array(char **tokens, size_t n);
