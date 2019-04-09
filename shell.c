@@ -129,7 +129,7 @@ int detect_redirection(struct tokens *tokens) {
 void init_shell() {
 	/* Our shell is connected to standard input. */
 	shell_terminal = STDIN_FILENO;
-
+	
 	/* Check if we are running interactively */
 	shell_is_interactive = isatty(shell_terminal);
 
@@ -155,7 +155,6 @@ int main(unused int argc, unused char *argv[]) {
 	init_shell();
 
 	static char line[4096];
-	int line_num = 0;
 	/* get the environment variable PATH */
 	char *path = getenv("PATH");
 	/* set deliminator to colon */
@@ -164,8 +163,7 @@ int main(unused int argc, unused char *argv[]) {
 	char execPath[100];
 	/* Please only print shell prompts when standard input is not a tty */
 	if (shell_is_interactive)
-		fprintf(stdout, "%d: ", line_num);
-
+		fprintf(stdout, "Anqi's Shell >> ");
 	while (fgets(line, 4096, stdin)) {
 		/* Split our line into words. */
 		struct tokens *tokens = tokenize(line);
@@ -217,6 +215,20 @@ int main(unused int argc, unused char *argv[]) {
 			int status;
 			child_pid = fork();
 			if(child_pid == 0) {
+				/* let signal work as default */
+				signal(SIGSTOP, SIG_DFL);
+				signal(SIGINT, SIG_DFL);
+				signal(SIGQUIT, SIG_DFL);
+				/* set parent group id */
+				pid_t cpid = getpid();
+				/* change process group to its own group */
+				if (setpgid(cpid, cpid) < 0)
+					perror("setpgid failed.");
+				/* ignore tty output signal */
+				signal(SIGTTOU, SIG_IGN);
+				/* change this process to foreground */
+				if(tcsetpgrp(0, cpid) < 0)
+                    perror("tcsetpgrp failed.");
 				/* This is done by the child process. */
 				execv(tokens_get_token(tokens, 0), tokens_copy);
 				/* if this call return, meaning PATH is not correct */
@@ -239,7 +251,20 @@ int main(unused int argc, unused char *argv[]) {
 				exit(0);
 			}
 			else {
+				/* ignore signals in the background process */
+				signal(SIGINT, SIG_IGN);
+				signal(SIGQUIT, SIG_IGN);
+				signal(SIGSTOP, SIG_IGN);
+				signal(SIGTTOU, SIG_IGN);
+				/* get parent process id */
+				pid_t ppid = getpid();
+				/* set background process to its own group */
+				if (setpgid(ppid, ppid) < 0)
+					perror("set group id failed.");
+				/* wait for child process */
 				wait(&status);
+				if (tcsetpgrp(0, ppid) < 0)
+					perror("convert background to fg failed.");
 			}
 			/* check if the output is redirected */
 			if (redir_out) {
@@ -261,7 +286,7 @@ int main(unused int argc, unused char *argv[]) {
 
 		if (shell_is_interactive)
 			/* Please only print shell prompts when standard input is not a tty */
-			fprintf(stdout, "%d: ", ++line_num);
+			fprintf(stdout, "Anqi's Shell >> ");
 		/* if stdout is redirected we need to close the fd file */
 		if (redir_out) {
 			redir_out = false;
