@@ -12,6 +12,7 @@
 #include <fcntl.h>
 
 #include "tokenizer.h"
+#include "linklist.h"
 
 extern char **environ;
 
@@ -136,6 +137,9 @@ int bg_proc_detect(struct tokens *tokens) {
 
 /* Intialization procedures for this shell */
 void init_shell() {
+	/* signal ignoring */
+	signal(SIGINT, SIG_IGN);
+	signal(SIGQUIT, SIG_IGN);
 	/* Our shell is connected to standard input. */
 	shell_terminal = STDIN_FILENO;
 	
@@ -160,13 +164,9 @@ void init_shell() {
 	}
 }
 
-void child_handler() {
-	printf("child process terminated.\n");
-}
-
 int main(unused int argc, unused char *argv[]) {
+	/* initiate the shell */
 	init_shell();
-
 	static char line[4096];
 	/* get the environment variable PATH */
 	char *path = getenv("PATH");
@@ -199,7 +199,7 @@ int main(unused int argc, unused char *argv[]) {
 		if (!bg_proc_detect(tokens)) {
 			bg_proc = true;
 			// prevent children from being zombie
-        	signal(SIGCHLD, child_handler);
+        	signal(SIGCHLD, SIG_IGN);
 			tokens_copy[tokens_get_length(tokens) - 1] = NULL;
 			shorten_tokens(tokens, 1);
 		} else {
@@ -243,7 +243,6 @@ int main(unused int argc, unused char *argv[]) {
 			child_pid = fork();
 			if(child_pid == 0) {
 				/* let signal work as default */
-				signal(SIGSTOP, SIG_DFL);
 				signal(SIGINT, SIG_DFL);
 				signal(SIGQUIT, SIG_DFL);
 				/* set parent group id */
@@ -283,7 +282,6 @@ int main(unused int argc, unused char *argv[]) {
 				/* ignore signals in the background process */
 				signal(SIGINT, SIG_IGN);
 				signal(SIGQUIT, SIG_IGN);
-				signal(SIGSTOP, SIG_IGN);
 				signal(SIGTTOU, SIG_IGN);
 				/* get parent process id */
 				pid_t ppid = getpid();
@@ -315,7 +313,6 @@ int main(unused int argc, unused char *argv[]) {
 				redir_in = false;
 			}
 		}
-
 		if (shell_is_interactive)
 			/* Please only print shell prompts when standard input is not a tty */
 			fprintf(stdout, "Anqi's Shell >> ");
@@ -330,6 +327,5 @@ int main(unused int argc, unused char *argv[]) {
 		/* Clean up memory */
 		tokens_destroy(tokens);
 	}
-
 	return 0;
 }

@@ -31,6 +31,13 @@ int detect_redirection(struct tokens *tokens) {
 	return -1;
 }
 
+int bg_proc_detect(struct tokens *tokens) {
+	if(!strcmp(tokens_get_token(tokens, tokens_get_length(tokens) - 1), "&"))
+		return 0;
+	else
+		return -1;
+}
+
 int main() {
 	char line[200];
 	while(fgets(line,199, stdin)) {
@@ -41,13 +48,7 @@ int main() {
 		// for (int i = 0; i < 3; i++) {
 		// 	printf("%p\n", ele[i]);;
 		// }
-		char *tokens_copy[20] = {NULL};
-		int length = tokens_get_length(tokens);
-		printf("%d\n", length);
-		printf("%d\n", sizeof(char*));
-        memcpy(tokens_copy, get_tokens(tokens), length * 8);
-		for (int i = 0; i < tokens_get_length(tokens); i++)
-			printf("%s\n", tokens_copy[i]);
+		printf("%d\n", bg_proc_detect(tokens));
 		tokens_destroy(tokens);
 	}
 }
