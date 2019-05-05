@@ -12,7 +12,6 @@
 #include <fcntl.h>
 
 #include "tokenizer.h"
-#include "linklist.h"
 
 extern char **environ;
 
@@ -172,8 +171,6 @@ int main(unused int argc, unused char *argv[]) {
 	char *path = getenv("PATH");
 	/* set deliminator to colon */
 	char *delim = ":";
-	/* init bg jobs */
-	int jobs[100];
 	/* init temp exepath to store temp string */
 	char execPath[100];
 	/* Please only print shell prompts when standard input is not a tty */
