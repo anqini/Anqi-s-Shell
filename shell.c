@@ -205,7 +205,7 @@ int main(unused int argc, unused char *argv[]) {
 		/* check redirection output */
 		if (detect_redirection(tokens) == 1) {
 			/* open file */
-			fd = open(tokens_get_token(tokens, tokens_get_length(tokens) - 1), O_WRONLY | O_CREAT);
+			fd = open(tokens_get_token(tokens, tokens_get_length(tokens) - 1), O_WRONLY | O_APPEND | O_CREAT);
 			/* redirect output */
 			if (dup2(fd, 1) < 0)
 				printf("Convert output failed.");
@@ -293,22 +293,22 @@ int main(unused int argc, unused char *argv[]) {
 					perror("convert background to fg failed.");
 				signal(SIGTTOU, SIG_DFL);
 			}
-			/* check if the output is redirected */
-			if (redir_out) {
-				if(dup2(saved_stdout, 1) < 0)
-					printf("convert stdout failed...\n");
-				close(saved_stdout);
-				close(fd);
-				redir_out = false;
-			}
-			/* check if the input is redirected */
-			if (redir_in) {
-				if(dup2(saved_stdin, 0) < 0)
-					printf("Convert stdin Back failed...\n");
-				close(saved_stdin);
-				close(fd);
-				redir_in = false;
-			}
+		}
+		/* check if the output is redirected */
+		if (redir_out) {
+			if(dup2(saved_stdout, 1) < 0)
+				printf("convert stdout failed...\n");
+			// close(saved_stdout);
+			close(fd);
+			redir_out = false;
+		}
+		/* check if the input is redirected */
+		if (redir_in) {
+			if(dup2(saved_stdin, 0) < 0)
+				printf("Convert stdin Back failed...\n");
+			// close(saved_stdin);
+			close(fd);
+			redir_in = false;
 		}
 		if (shell_is_interactive)
 			/* Please only print shell prompts when standard input is not a tty */
